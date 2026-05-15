@@ -1,4 +1,4 @@
-import { readRange, appendRow, updateRange } from "./google";
+import { readRange, appendRow, updateRange, deleteSheetRow } from "./google";
 
 export const BILLING_SHEET = "📋 마스터데이터";
 
@@ -38,29 +38,33 @@ export async function getBillingData(): Promise<BillingRow[]> {
 }
 
 export async function addBillingRow(data: {
-  날짜: string;
-  연도: string;
-  월: string;
-  고객사: string;
-  서비스: string;
-  서비스분류: string;
-  공급가액: string;
-  부가세포함: string;
-  사업부문: string;
+  날짜: string; 연도: string; 월: string;
+  고객사: string; 서비스: string; 서비스분류: string;
+  공급가액: string; 부가세포함: string; 사업부문: string;
 }) {
   await appendRow(`${BILLING_SHEET}!A:K`, [
-    "",               // A: 번호 (공란)
-    data.날짜,        // B
-    data.연도,        // C
-    data.월,          // D
-    data.고객사,      // E
-    data.서비스,      // F
-    data.서비스분류,  // G
-    data.공급가액,    // H
-    data.부가세포함,  // I
-    "",               // J: 입금확인 (초기 공란)
-    data.사업부문,    // K
+    "", data.날짜, data.연도, data.월, data.고객사,
+    data.서비스, data.서비스분류, data.공급가액, data.부가세포함, "", data.사업부문,
   ]);
+}
+
+export async function updateBillingRow(
+  rowIndex: number,
+  data: {
+    날짜: string; 연도: string; 월: string;
+    고객사: string; 서비스: string; 서비스분류: string;
+    공급가액: string; 부가세포함: string; 사업부문: string;
+  }
+) {
+  await updateRange(`${BILLING_SHEET}!B${rowIndex}:I${rowIndex}`, [[
+    data.날짜, data.연도, data.월, data.고객사,
+    data.서비스, data.서비스분류, data.공급가액, data.부가세포함,
+  ]]);
+  await updateRange(`${BILLING_SHEET}!K${rowIndex}`, [[data.사업부문]]);
+}
+
+export async function deleteBillingRow(rowIndex: number) {
+  await deleteSheetRow(BILLING_SHEET, rowIndex);
 }
 
 export async function setBillingPayment(rowIndex: number, value: string) {
