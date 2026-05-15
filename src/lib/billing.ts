@@ -42,9 +42,8 @@ export async function addBillingRow(data: {
   고객사: string; 서비스: string; 서비스분류: string;
   공급가액: string; 부가세포함: string; 사업부문: string;
 }) {
-  // 현재 데이터 행 수를 읽어서 다음 행 번호를 정확히 계산
-  // A열 전체를 읽어 마지막 행을 파악 (헤더 포함)
-  const existing = await readRange(`${BILLING_SHEET}!A:A`);
+  // B열(날짜)을 기준으로 마지막 행 번호를 계산 — A열(번호)은 항상 공란이라 사용 불가
+  const existing = await readRange(`${BILLING_SHEET}!B:B`);
   const nextRow = existing.length + 1; // 1-based row number
 
   // 번호(A)는 공란, 날짜(B)부터 사업부문(K)까지 기록
