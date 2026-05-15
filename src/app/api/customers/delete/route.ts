@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { deleteCustomer } from "@/lib/customers";
 import { auth } from "@/auth";
 
@@ -19,6 +20,7 @@ export async function POST(req: NextRequest) {
     if (!result.ok) {
       return NextResponse.json({ ok: false, reason: result.reason }, { status: 404 });
     }
+    revalidateTag("customers", { expire: 0 });
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[api/customers/delete] failed", err);

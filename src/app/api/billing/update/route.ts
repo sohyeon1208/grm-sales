@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { setBillingPayment } from "@/lib/billing";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +11,7 @@ export async function POST(req: Request) {
 
   const { rowIndex, value } = await req.json();
   await setBillingPayment(Number(rowIndex), String(value ?? ""));
+  revalidateTag("billing", { expire: 0 });
 
   return NextResponse.json({ ok: true });
 }

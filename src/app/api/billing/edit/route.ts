@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { updateBillingRow } from "@/lib/billing";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +24,7 @@ export async function POST(req: Request) {
       부가세포함: String(body.부가세포함 ?? "").trim(),
       사업부문: String(body.사업부문 ?? "").trim(),
     });
+    revalidateTag("billing", { expire: 0 });
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[billing/edit] error:", err);

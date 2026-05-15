@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { updateHistory } from "@/lib/history";
 import { auth } from "@/auth";
 
@@ -21,6 +22,7 @@ export async function POST(req: NextRequest) {
     }
 
     await updateHistory(source, rowIndex, { 날짜, 유형, 내용 });
+    revalidateTag("history", { expire: 0 });
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[api/history/update] failed", err);

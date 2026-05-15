@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { deleteHistory } from "@/lib/history";
 import { auth } from "@/auth";
 
@@ -18,6 +19,7 @@ export async function POST(req: NextRequest) {
     }
 
     await deleteHistory(source, rowIndex);
+    revalidateTag("history", { expire: 0 });
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[api/history/delete] failed", err);

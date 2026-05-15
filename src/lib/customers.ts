@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { hasGoogleEnv, readRange, updateRange, appendRow, deleteSheetRow } from "@/lib/google";
 
 /**
@@ -109,18 +110,22 @@ function isRealCustomer(c: Customer): boolean {
   return true;
 }
 
-export async function getCustomers(): Promise<Customer[]> {
-  if (!hasGoogleEnv()) return [];
-  try {
-    const rows = await readRange(`${CUSTOMERS_SHEET_NAME}!A${DATA_START_ROW}:S`);
-    return rows
-      .map((row, idx) => rowToCustomer(row, DATA_START_ROW + idx))
-      .filter(isRealCustomer);
-  } catch (err) {
-    console.error("[customers.getCustomers] failed", err);
-    return [];
-  }
-}
+export const getCustomers = unstable_cache(
+  async (): Promise<Customer[]> => {
+    if (!hasGoogleEnv()) return [];
+    try {
+      const rows = await readRange(`${CUSTOMERS_SHEET_NAME}!A${DATA_START_ROW}:S`);
+      return rows
+        .map((row, idx) => rowToCustomer(row, DATA_START_ROW + idx))
+        .filter(isRealCustomer);
+    } catch (err) {
+      console.error("[customers.getCustomers] failed", err);
+      return [];
+    }
+  },
+  ["customers-data"],
+  { tags: ["customers"] }
+);
 
 /**
  * 식별 우선순위: 영업활동명 → 그룹ID → 그룹명

@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { hasGoogleEnv, readRange, appendRow, updateRange, deleteSheetRow } from "@/lib/google";
 
 export const HISTORY_ARCHIVE_SHEET = "히스토리 전체";
@@ -89,15 +90,19 @@ async function readSheetDynamic(
 }
 
 /** 두 탭의 모든 히스토리 — 최신 날짜 먼저 */
-export async function getHistory(): Promise<HistoryEntry[]> {
-  if (!hasGoogleEnv()) return [];
-  const [archive, input] = await Promise.all([
-    readSheetDynamic(HISTORY_ARCHIVE_SHEET, "archive"),
-    readSheetDynamic(HISTORY_INPUT_SHEET, "input"),
-  ]);
-  const all = [...archive, ...input];
-  return all.sort((a, b) => normDate(b.날짜).localeCompare(normDate(a.날짜)));
-}
+export const getHistory = unstable_cache(
+  async (): Promise<HistoryEntry[]> => {
+    if (!hasGoogleEnv()) return [];
+    const [archive, input] = await Promise.all([
+      readSheetDynamic(HISTORY_ARCHIVE_SHEET, "archive"),
+      readSheetDynamic(HISTORY_INPUT_SHEET, "input"),
+    ]);
+    const all = [...archive, ...input];
+    return all.sort((a, b) => normDate(b.날짜).localeCompare(normDate(a.날짜)));
+  },
+  ["history-data"],
+  { tags: ["history"] }
+);
 
 /**
  * 특정 고객의 히스토리.

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { addCustomer, findCustomerByKey } from "@/lib/customers";
 
 export const dynamic = "force-dynamic";
@@ -46,6 +47,7 @@ export async function POST(req: NextRequest) {
       계약시작일: String(body.계약시작일 ?? "").trim(),
     });
 
+    revalidateTag("customers", { expire: 0 });
     return NextResponse.json({ ok: true, key: 영업활동명 });
   } catch (err) {
     console.error("[api/customers/create] failed", err);

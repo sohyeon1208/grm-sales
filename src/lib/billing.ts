@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { readRange, updateRange, deleteSheetRow } from "./google";
 
 export const BILLING_SHEET = "📋 마스터데이터";
@@ -18,24 +19,28 @@ export type BillingRow = {
   사업부문: string;
 };
 
-export async function getBillingData(): Promise<BillingRow[]> {
-  const rows = await readRange(`${BILLING_SHEET}!A2:K`);
-  return rows
-    .map((row, i) => ({
-      rowIndex: i + 2,
-      날짜: s(row[1]),
-      연도: s(row[2]),
-      월: s(row[3]),
-      고객사: s(row[4]),
-      서비스: s(row[5]),
-      서비스분류: s(row[6]),
-      공급가액: s(row[7]),
-      부가세포함: s(row[8]),
-      입금확인: s(row[9]),
-      사업부문: s(row[10]),
-    }))
-    .filter((r) => r.날짜 || r.고객사);
-}
+export const getBillingData = unstable_cache(
+  async (): Promise<BillingRow[]> => {
+    const rows = await readRange(`${BILLING_SHEET}!A2:K`);
+    return rows
+      .map((row, i) => ({
+        rowIndex: i + 2,
+        날짜: s(row[1]),
+        연도: s(row[2]),
+        월: s(row[3]),
+        고객사: s(row[4]),
+        서비스: s(row[5]),
+        서비스분류: s(row[6]),
+        공급가액: s(row[7]),
+        부가세포함: s(row[8]),
+        입금확인: s(row[9]),
+        사업부문: s(row[10]),
+      }))
+      .filter((r) => r.날짜 || r.고객사);
+  },
+  ["billing-data"],
+  { tags: ["billing"] }
+);
 
 export async function addBillingRow(data: {
   날짜: string; 연도: string; 월: string;

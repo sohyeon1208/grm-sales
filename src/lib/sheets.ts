@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { hasGoogleEnv, readRange } from "@/lib/google";
 
 /**
@@ -24,26 +25,30 @@ function toNumber(value: string | undefined | null): number {
   return Number(value.replace(/,/g, "")) || 0;
 }
 
-export async function getSalesData(): Promise<SalesRow[]> {
-  if (!hasGoogleEnv()) return [];
+export const getSalesData = unstable_cache(
+  async (): Promise<SalesRow[]> => {
+    if (!hasGoogleEnv()) return [];
 
-  try {
-    const rows = await readRange(`${SALES_SHEET_NAME}!A${START_ROW}:K`);
-    if (rows.length === 0) return [];
+    try {
+      const rows = await readRange(`${SALES_SHEET_NAME}!A${START_ROW}:K`);
+      if (rows.length === 0) return [];
 
-    return rows
-      .filter((row) => row[2])
-      .map((row) => ({
-        연도: toNumber(row[2]),
-        월: toNumber(row[3]),
-        거래처: row[4] ?? "",
-        서비스: row[5] ?? "",
-        서비스분류: row[6] ?? "",
-        매출액: toNumber(row[7]),
-        사업부문: row[10] ?? "",
-      }));
-  } catch (err) {
-    console.error("[sheets.getSalesData] failed", err);
-    return [];
-  }
-}
+      return rows
+        .filter((row) => row[2])
+        .map((row) => ({
+          연도: toNumber(row[2]),
+          월: toNumber(row[3]),
+          거래처: row[4] ?? "",
+          서비스: row[5] ?? "",
+          서비스분류: row[6] ?? "",
+          매출액: toNumber(row[7]),
+          사업부문: row[10] ?? "",
+        }));
+    } catch (err) {
+      console.error("[sheets.getSalesData] failed", err);
+      return [];
+    }
+  },
+  ["sales-data"],
+  { tags: ["billing"] }
+);
