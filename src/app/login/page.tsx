@@ -31,14 +31,11 @@ export default function LoginPage({
       >
         {/* 로고 */}
         <div style={{ textAlign: "center" }}>
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: "50%",
-              background: "linear-gradient(135deg, #7B70EE, #00CFAA)",
-              margin: "0 auto 14px",
-            }}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/gooroomee-logo.png"
+            alt="Gooroomee"
+            style={{ width: 100, height: 76, margin: "0 auto 14px", display: "block", objectFit: "contain" }}
           />
           <h1 style={{ color: "rgba(26,28,51,0.9)", fontSize: 22, fontWeight: 700, margin: 0 }}>
             Gooroomee Sales

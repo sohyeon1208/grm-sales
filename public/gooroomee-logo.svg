@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 195">
+  <defs>
+    <linearGradient id="cloudGrad" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0%" stop-color="#52AAFF"/>
+      <stop offset="100%" stop-color="#1530C8"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#cloudGrad)" d="
+    M 48,150
+    C 22,150 8,130 16,112
+    C 6,104 2,90 9,77
+    C 16,64 29,58 42,62
+    C 44,45 57,33 73,33
+    C 77,18 90,10 105,13
+    C 113,3 127,-1 140,5
+    C 152,-1 166,3 172,15
+    C 186,10 202,19 205,34
+    C 222,34 234,49 231,66
+    C 245,72 252,88 246,103
+    C 253,112 254,128 245,140
+    C 238,152 223,157 208,152
+    C 200,164 184,170 170,162
+    C 158,172 142,174 130,166
+    C 118,174 102,172 91,162
+    C 77,170 58,164 48,150
+    Z
+  "/>
+  <text
+    x="130" y="103"
+    font-family="'Arial Rounded MT Bold', 'Nunito', Arial, sans-serif"
+    font-weight="800"
+    font-size="35"
+    fill="white"
+    text-anchor="middle"
+    dominant-baseline="middle"
+    letter-spacing="-0.5"
+  >Gooroomee</text>
+</svg>
