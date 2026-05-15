@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { findCustomerByKey } from "@/lib/customers";
 import { getHistoryFor } from "@/lib/history";
+import { getBillingData } from "@/lib/billing";
 import CustomerHeader from "@/components/customer/CustomerHeader";
 import ContractCard from "@/components/customer/ContractCard";
 import SettlementCard from "@/components/customer/SettlementCard";
 import HistoryTimeline from "@/components/customer/HistoryTimeline";
+import BillingHistoryCard from "@/components/customer/BillingHistoryCard";
 
 export const dynamic = "force-dynamic";
 
@@ -36,9 +38,18 @@ export default async function CustomerDetailPage({ params }: PageProps) {
     );
   }
 
-  const history = await getHistoryFor(customer.영업활동명, {
-    그룹ID: customer.그룹ID || undefined,
-  });
+  const [history, allBillingRows] = await Promise.all([
+    getHistoryFor(customer.영업활동명, { 그룹ID: customer.그룹ID || undefined }),
+    getBillingData(),
+  ]);
+
+  // 고객사명으로 청구 이력 필터링 (영업활동명 또는 세금계산서고객사명 매칭)
+  const customerBillingRows = allBillingRows
+    .filter((r) =>
+      r.고객사 === customer.영업활동명 ||
+      (customer.세금계산서고객사명 && r.고객사 === customer.세금계산서고객사명)
+    )
+    .sort((a, b) => b.날짜.localeCompare(a.날짜));
 
   return (
     <div className="px-6 py-6 max-w-[1400px] mx-auto">
@@ -49,6 +60,7 @@ export default async function CustomerDetailPage({ params }: PageProps) {
         <div className="space-y-5">
           <ContractCard customer={customer} />
           <SettlementCard customer={customer} />
+          <BillingHistoryCard rows={customerBillingRows} />
         </div>
 
         {/* 오른쪽 — 히스토리 */}

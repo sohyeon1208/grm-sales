@@ -27,18 +27,17 @@ export default function EditBillingModal({
   const T = isDark ? DARK : LIGHT;
   const [form, setForm] = useState<Form | null>(null);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const [showSugg, setShowSugg] = useState(false);
+  const [highlightIdx, setHighlightIdx] = useState(-1);
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 모달 열릴 때 row 데이터로 form 초기화
-  if (open && row && (!form || form !== (form as Form))) {
-    if (!form) {
-      setForm({
-        날짜: row.날짜, 고객사: row.고객사, 서비스: row.서비스,
-        서비스분류: row.서비스분류, 공급가액: row.공급가액,
-        부가세포함: row.부가세포함, 사업부문: row.사업부문,
-      });
-    }
+  if (open && row && !form) {
+    setForm({
+      날짜: row.날짜, 고객사: row.고객사, 서비스: row.서비스,
+      서비스분류: row.서비스분류, 공급가액: row.공급가액,
+      부가세포함: row.부가세포함, 사업부문: row.사업부문,
+    });
   }
 
   if (!open || !row) return null;
@@ -65,17 +64,47 @@ export default function EditBillingModal({
     });
   };
 
-  const handleClose = () => { setForm(null); onClose(); };
+  const selectSuggestion = (c: string) => {
+    if (blurTimer.current) clearTimeout(blurTimer.current);
+    set("고객사", c);
+    setShowSugg(false);
+    setHighlightIdx(-1);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSugg || suggestions.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightIdx((i) => Math.min(i + 1, suggestions.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightIdx((i) => Math.max(i - 1, -1));
+    } else if (e.key === "Enter" && highlightIdx >= 0) {
+      e.preventDefault();
+      selectSuggestion(suggestions[highlightIdx]);
+    } else if (e.key === "Escape") {
+      setShowSugg(false);
+      setHighlightIdx(-1);
+    }
+  };
+
+  const handleClose = () => { setForm(null); setError(""); onClose(); };
 
   const submit = async () => {
     if (!form.날짜 || !form.고객사) return;
     setSaving(true);
+    setError("");
     try {
-      await fetch("/api/billing/edit", {
+      const res = await fetch("/api/billing/edit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rowIndex: row.rowIndex, ...form }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(`저장 실패: ${data.error || res.status}`);
+        return;
+      }
       setForm(null);
       onClose();
       router.refresh();
@@ -110,20 +139,27 @@ export default function EditBillingModal({
             <input
               type="text"
               value={form.고객사}
-              onChange={(e) => { set("고객사", e.target.value); setShowSugg(true); }}
+              onChange={(e) => { set("고객사", e.target.value); setShowSugg(true); setHighlightIdx(-1); }}
               onFocus={() => setShowSugg(true)}
-              onBlur={() => { blurTimer.current = setTimeout(() => setShowSugg(false), 150); }}
+              onBlur={() => { blurTimer.current = setTimeout(() => { setShowSugg(false); setHighlightIdx(-1); }, 150); }}
+              onKeyDown={handleKeyDown}
               style={inp}
             />
             {showSugg && suggestions.length > 0 && (
               <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10, background: T.bg.card, border: `1px solid ${T.border}`, borderRadius: 8, boxShadow: "0 4px 20px rgba(0,0,0,0.15)", maxHeight: 200, overflowY: "auto" }}>
-                {suggestions.map((c) => (
+                {suggestions.map((c, i) => (
                   <div
                     key={c}
-                    onMouseDown={() => { if (blurTimer.current) clearTimeout(blurTimer.current); set("고객사", c); setShowSugg(false); }}
-                    style={{ padding: "9px 14px", fontSize: 13, cursor: "pointer", color: T.text.primary, borderBottom: `1px solid ${T.border}` }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.06)" : "rgba(26,28,51,0.04)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                    onMouseDown={() => selectSuggestion(c)}
+                    style={{
+                      padding: "9px 14px", fontSize: 13, cursor: "pointer", color: T.text.primary,
+                      borderBottom: `1px solid ${T.border}`,
+                      background: i === highlightIdx
+                        ? (isDark ? "rgba(123,112,238,0.2)" : "rgba(123,112,238,0.1)")
+                        : "transparent",
+                    }}
+                    onMouseEnter={() => setHighlightIdx(i)}
+                    onMouseLeave={() => setHighlightIdx(-1)}
                   >
                     {c}
                   </div>
@@ -160,6 +196,12 @@ export default function EditBillingModal({
             <input type="text" value={form.사업부문} onChange={(e) => set("사업부문", e.target.value)} style={inp} />
           </div>
         </div>
+
+        {error && (
+          <div style={{ marginTop: 12, padding: "8px 12px", borderRadius: 8, background: "rgba(239,68,68,0.1)", color: "#EF4444", fontSize: 12 }}>
+            {error}
+          </div>
+        )}
 
         <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
           <button onClick={handleClose} style={{ padding: "9px 20px", borderRadius: 8, border: `1px solid ${T.border}`, background: "transparent", color: T.text.secondary, fontSize: 13, cursor: "pointer" }}>취소</button>

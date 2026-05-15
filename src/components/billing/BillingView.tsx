@@ -9,7 +9,7 @@ import NewBillingModal from "./NewBillingModal";
 import EditBillingModal from "./EditBillingModal";
 
 type TaxInfo = { issued: boolean; date: string };
-type StatusEdit = { rowIndex: number; field: "tax" | "pay" } | null;
+type DateEdit = { rowIndex: number; field: "tax" | "pay" } | null;
 
 const INIT_KEY = "billing_init_v2";
 const PAGE_SIZES = [50, 100, 200, 500];
@@ -29,42 +29,34 @@ export default function BillingView({ rows }: { rows: BillingRow[] }) {
   const { isDark } = useTheme();
   const T = isDark ? DARK : LIGHT;
 
-  // 필터
   const [yearFilter, setYearFilter] = useState("");
   const [monthFilter, setMonthFilter] = useState("");
   const [search, setSearch] = useState("");
 
-  // 모달
   const [newOpen, setNewOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<BillingRow | null>(null);
 
-  // 삭제 확인
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // 페이지네이션
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
 
-  // 일괄 선택
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
-  // 상태 (localStorage)
   const [taxStatus, setTaxStatus] = useState<Record<number, TaxInfo>>({});
   const [payStatus, setPayStatus] = useState<Record<number, string>>({});
   const [payDates, setPayDates] = useState<Record<number, string>>({});
 
-  // 인라인 날짜 수정
-  const [editing, setEditing] = useState<StatusEdit>(null);
+  // 날짜 변경용 인라인 에디터
+  const [dateEdit, setDateEdit] = useState<DateEdit>(null);
   const [editDate, setEditDate] = useState(today());
 
-  // 고객사 목록 (자동완성용)
   const customers = useMemo(
     () => Array.from(new Set(rows.map((r) => r.고객사).filter(Boolean))).sort(),
     [rows]
   );
 
-  // 초기화 + localStorage 로드
   useEffect(() => {
     if (!localStorage.getItem(INIT_KEY)) {
       rows.forEach((r) => {
@@ -92,7 +84,6 @@ export default function BillingView({ rows }: { rows: BillingRow[] }) {
     setPayDates(pd);
   }, [rows]);
 
-  // 필터 변경 시 첫 페이지로
   useEffect(() => { setPage(1); setSelected(new Set()); }, [yearFilter, monthFilter, search, pageSize]);
 
   const years = useMemo(
@@ -116,7 +107,6 @@ export default function BillingView({ rows }: { rows: BillingRow[] }) {
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
 
-  // 합계 (필터 기준)
   const totalSupply = filtered.reduce((s, r) => s + (parseFloat(String(r.공급가액).replace(/,/g, "")) || 0), 0);
   const totalVat = filtered.reduce((s, r) => {
     const n = r.부가세포함
@@ -169,30 +159,46 @@ export default function BillingView({ rows }: { rows: BillingRow[] }) {
     setSelected(new Set());
   };
 
-  // ─── 인라인 상태 토글 ───
-  const startEdit = (rowIndex: number, field: "tax" | "pay") => {
-    setEditDate(field === "tax" ? taxStatus[rowIndex]?.date || today() : payDates[rowIndex] || today());
-    setEditing({ rowIndex, field });
+  // ─── 개별 상태 토글 (원클릭 = 오늘 날짜로 즉시 적용) ───
+  const markTax = (ri: number, row: BillingRow) => {
+    const info = { issued: true, date: row.날짜 || today() };
+    localStorage.setItem(`billing_tax_${ri}`, JSON.stringify(info));
+    setTaxStatus((p) => ({ ...p, [ri]: info }));
   };
-  const confirmEdit = () => {
-    if (!editing) return;
-    const { rowIndex, field } = editing;
+  const clearTax = (ri: number) => {
+    localStorage.removeItem(`billing_tax_${ri}`);
+    setTaxStatus((p) => { const n = { ...p }; delete n[ri]; return n; });
+  };
+  const markPay = (ri: number) => {
+    localStorage.setItem(`billing_pay_${ri}`, "O");
+    setPayStatus((p) => ({ ...p, [ri]: "O" }));
+  };
+  const clearPay = (ri: number) => {
+    localStorage.removeItem(`billing_pay_${ri}`); localStorage.removeItem(`billing_pay_date_${ri}`);
+    setPayStatus((p) => { const n = { ...p }; delete n[ri]; return n; });
+    setPayDates((p) => { const n = { ...p }; delete n[ri]; return n; });
+  };
+
+  // ─── 날짜 변경 (날짜 텍스트 클릭 시) ───
+  const openDateEdit = (rowIndex: number, field: "tax" | "pay") => {
+    const current = field === "tax" ? taxStatus[rowIndex]?.date : payDates[rowIndex];
+    setEditDate(current || today());
+    setDateEdit({ rowIndex, field });
+  };
+  const confirmDateEdit = () => {
+    if (!dateEdit) return;
+    const { rowIndex, field } = dateEdit;
     if (field === "tax") {
       const info = { issued: true, date: editDate };
       localStorage.setItem(`billing_tax_${rowIndex}`, JSON.stringify(info));
       setTaxStatus((p) => ({ ...p, [rowIndex]: info }));
     } else {
       localStorage.setItem(`billing_pay_${rowIndex}`, "O");
-      if (editDate) { localStorage.setItem(`billing_pay_date_${rowIndex}`, editDate); setPayDates((p) => ({ ...p, [rowIndex]: editDate })); }
+      localStorage.setItem(`billing_pay_date_${rowIndex}`, editDate);
       setPayStatus((p) => ({ ...p, [rowIndex]: "O" }));
+      setPayDates((p) => ({ ...p, [rowIndex]: editDate }));
     }
-    setEditing(null);
-  };
-  const clearTax = (ri: number) => { localStorage.removeItem(`billing_tax_${ri}`); setTaxStatus((p) => { const n = { ...p }; delete n[ri]; return n; }); };
-  const clearPay = (ri: number) => {
-    localStorage.removeItem(`billing_pay_${ri}`); localStorage.removeItem(`billing_pay_date_${ri}`);
-    setPayStatus((p) => { const n = { ...p }; delete n[ri]; return n; });
-    setPayDates((p) => { const n = { ...p }; delete n[ri]; return n; });
+    setDateEdit(null);
   };
 
   // ─── 삭제 ───
@@ -206,7 +212,7 @@ export default function BillingView({ rows }: { rows: BillingRow[] }) {
     } finally { setDeleting(false); }
   };
 
-  // ─── 스타일 상수 ───
+  // ─── 스타일 ───
   const thStyle: React.CSSProperties = {
     padding: "10px 12px", textAlign: "left", color: T.text.muted, fontWeight: 600, fontSize: 12,
     borderBottom: `1px solid ${T.border}`, whiteSpace: "nowrap",
@@ -217,7 +223,6 @@ export default function BillingView({ rows }: { rows: BillingRow[] }) {
   const btnSm = (bg: string, color: string, border?: string): React.CSSProperties => ({ padding: "4px 10px", borderRadius: 6, background: bg, color, border: border ?? "none", fontSize: 12, cursor: "pointer", fontWeight: 500 });
   const iconBtn: React.CSSProperties = { background: "none", border: "none", cursor: "pointer", padding: "3px 5px", borderRadius: 4, color: T.text.muted, fontSize: 13 };
 
-  // ─── 페이지네이션 번호 ───
   const pageNums = () => {
     const pages: (number | "...")[] = [];
     for (let i = 1; i <= totalPages; i++) {
@@ -308,8 +313,8 @@ export default function BillingView({ rows }: { rows: BillingRow[] }) {
               const tax = taxStatus[row.rowIndex];
               const paid = payStatus[row.rowIndex] === "O";
               const payDate = payDates[row.rowIndex];
-              const isEditTax = editing?.rowIndex === row.rowIndex && editing.field === "tax";
-              const isEditPay = editing?.rowIndex === row.rowIndex && editing.field === "pay";
+              const isDateEditTax = dateEdit?.rowIndex === row.rowIndex && dateEdit.field === "tax";
+              const isDateEditPay = dateEdit?.rowIndex === row.rowIndex && dateEdit.field === "pay";
               const isDelConfirm = deleteConfirm === row.rowIndex;
               const vatDisplay = row.부가세포함 ? fmtMoney(row.부가세포함) : autoVat(row.공급가액);
 
@@ -318,7 +323,6 @@ export default function BillingView({ rows }: { rows: BillingRow[] }) {
                   onMouseEnter={(e) => (e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.02)" : "rgba(26,28,51,0.02)")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                 >
-                  {/* 체크박스 */}
                   <td style={{ ...tdStyle, textAlign: "center" }}>
                     <input type="checkbox" checked={selected.has(row.rowIndex)} onChange={() => toggleSelect(row.rowIndex)} style={{ cursor: "pointer" }} />
                   </td>
@@ -331,40 +335,56 @@ export default function BillingView({ rows }: { rows: BillingRow[] }) {
                   <td style={{ ...tdStyle, textAlign: "right", color: T.text.secondary, whiteSpace: "nowrap" }}>{vatDisplay}</td>
 
                   {/* 세금계산서 */}
-                  <td style={{ ...tdStyle, minWidth: 150 }}>
-                    {isEditTax ? (
-                      <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
+                  <td style={{ ...tdStyle, minWidth: 160 }}>
+                    {isDateEditTax ? (
+                      <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
                         <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} style={dateInp} />
-                        <button onClick={confirmEdit} style={btnSm("#7B70EE", "#fff")}>완료</button>
-                        <button onClick={() => setEditing(null)} style={btnSm("transparent", T.text.muted, `1px solid ${T.border}`)}>취소</button>
+                        <button onClick={confirmDateEdit} style={btnSm("#7B70EE", "#fff")}>확인</button>
+                        <button onClick={() => setDateEdit(null)} style={btnSm("transparent", T.text.muted, `1px solid ${T.border}`)}>취소</button>
                       </div>
                     ) : tax?.issued ? (
                       <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
                         <span style={{ padding: "3px 10px", borderRadius: 20, background: "rgba(0,207,170,0.12)", color: "#00CFAA", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}>발행완료</span>
-                        <span style={{ fontSize: 11, color: T.text.muted, cursor: "pointer", textDecoration: "underline dotted" }} onClick={() => startEdit(row.rowIndex, "tax")}>{tax.date}</span>
+                        <span
+                          onClick={() => openDateEdit(row.rowIndex, "tax")}
+                          style={{ fontSize: 11, color: T.text.muted, cursor: "pointer", textDecoration: "underline dotted", whiteSpace: "nowrap" }}
+                          title="날짜 변경"
+                        >{tax.date || "날짜 없음"}</span>
                         <button onClick={() => clearTax(row.rowIndex)} style={{ ...iconBtn, fontSize: 15 }} title="발행 취소">×</button>
                       </div>
                     ) : (
-                      <button onClick={() => startEdit(row.rowIndex, "tax")} style={{ padding: "3px 10px", borderRadius: 20, background: "rgba(245,158,11,0.1)", color: "#F59E0B", fontSize: 11, fontWeight: 600, border: "none", cursor: "pointer" }}>미발행</button>
+                      <button
+                        onClick={() => markTax(row.rowIndex, row)}
+                        style={{ padding: "3px 10px", borderRadius: 20, background: "rgba(245,158,11,0.1)", color: "#F59E0B", fontSize: 11, fontWeight: 600, border: "none", cursor: "pointer" }}
+                        title="클릭하면 발행완료로 변경"
+                      >미발행</button>
                     )}
                   </td>
 
                   {/* 입금여부 */}
-                  <td style={{ ...tdStyle, minWidth: 130 }}>
-                    {isEditPay ? (
-                      <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
+                  <td style={{ ...tdStyle, minWidth: 140 }}>
+                    {isDateEditPay ? (
+                      <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
                         <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} style={dateInp} />
-                        <button onClick={confirmEdit} style={btnSm("#7B70EE", "#fff")}>완료</button>
-                        <button onClick={() => setEditing(null)} style={btnSm("transparent", T.text.muted, `1px solid ${T.border}`)}>취소</button>
+                        <button onClick={confirmDateEdit} style={btnSm("#7B70EE", "#fff")}>확인</button>
+                        <button onClick={() => setDateEdit(null)} style={btnSm("transparent", T.text.muted, `1px solid ${T.border}`)}>취소</button>
                       </div>
                     ) : paid ? (
                       <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
                         <span style={{ padding: "3px 10px", borderRadius: 20, background: "rgba(59,130,246,0.12)", color: "#3B82F6", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}>입금완료</span>
-                        {payDate && <span style={{ fontSize: 11, color: T.text.muted, cursor: "pointer", textDecoration: "underline dotted" }} onClick={() => startEdit(row.rowIndex, "pay")}>{payDate}</span>}
+                        <span
+                          onClick={() => openDateEdit(row.rowIndex, "pay")}
+                          style={{ fontSize: 11, color: T.text.muted, cursor: "pointer", textDecoration: "underline dotted", whiteSpace: "nowrap" }}
+                          title="날짜 변경"
+                        >{payDate || "날짜 미설정"}</span>
                         <button onClick={() => clearPay(row.rowIndex)} style={{ ...iconBtn, fontSize: 15 }} title="입금 취소">×</button>
                       </div>
                     ) : (
-                      <button onClick={() => startEdit(row.rowIndex, "pay")} style={{ padding: "3px 10px", borderRadius: 20, background: "rgba(239,68,68,0.1)", color: "#EF4444", fontSize: 11, fontWeight: 600, border: "none", cursor: "pointer" }}>미입금</button>
+                      <button
+                        onClick={() => markPay(row.rowIndex)}
+                        style={{ padding: "3px 10px", borderRadius: 20, background: "rgba(239,68,68,0.1)", color: "#EF4444", fontSize: 11, fontWeight: 600, border: "none", cursor: "pointer" }}
+                        title="클릭하면 입금완료로 변경"
+                      >미입금</button>
                     )}
                   </td>
 
@@ -379,11 +399,9 @@ export default function BillingView({ rows }: { rows: BillingRow[] }) {
                       </div>
                     ) : (
                       <div style={{ display: "flex", gap: 4 }}>
-                        {/* 수정 */}
                         <button onClick={() => setEditTarget(row)} style={iconBtn} title="수정">
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                         </button>
-                        {/* 삭제 */}
                         <button onClick={() => setDeleteConfirm(row.rowIndex)} style={{ ...iconBtn, color: "#EF4444" }} title="삭제">
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
                         </button>
