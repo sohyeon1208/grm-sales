@@ -18,19 +18,23 @@ type Form = {
 };
 
 export default function EditBillingModal({
-  row, open, onClose, customers,
+  row, open, onClose, customers, masterCustomers = [],
 }: {
-  row: BillingRow | null; open: boolean; onClose: () => void; customers: string[];
+  row: BillingRow | null; open: boolean; onClose: () => void; customers: string[]; masterCustomers?: string[];
 }) {
   const router = useRouter();
   const { isDark } = useTheme();
   const T = isDark ? DARK : LIGHT;
   const [form, setForm] = useState<Form | null>(null);
+  const [linkedName, setLinkedName] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [showSugg, setShowSugg] = useState(false);
   const [highlightIdx, setHighlightIdx] = useState(-1);
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showSugg영업, setShowSugg영업] = useState(false);
+  const [highlightIdx영업, setHighlightIdx영업] = useState(-1);
+  const blurTimer영업 = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   if (open && row && !form) {
     setForm({
@@ -38,6 +42,7 @@ export default function EditBillingModal({
       서비스분류: row.서비스분류, 공급가액: row.공급가액,
       부가세포함: row.부가세포함, 사업부문: row.사업부문,
     });
+    setLinkedName(localStorage.getItem(`billing_linked_name_${row.rowIndex}`) ?? "");
   }
 
   if (!open || !row) return null;
@@ -45,6 +50,10 @@ export default function EditBillingModal({
 
   const suggestions = form.고객사
     ? customers.filter((c) => c.toLowerCase().includes(form.고객사.toLowerCase()) && c !== form.고객사).slice(0, 10)
+    : [];
+
+  const sugg영업 = linkedName
+    ? masterCustomers.filter((c) => c.toLowerCase().includes(linkedName.toLowerCase())).slice(0, 10)
     : [];
 
   const set = (key: keyof Form, value: string) => {
@@ -88,7 +97,22 @@ export default function EditBillingModal({
     }
   };
 
-  const handleClose = () => { setForm(null); setError(""); onClose(); };
+  const select영업Suggestion = (c: string) => {
+    if (blurTimer영업.current) clearTimeout(blurTimer영업.current);
+    setLinkedName(c);
+    setShowSugg영업(false);
+    setHighlightIdx영업(-1);
+  };
+
+  const handleKeyDown영업 = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSugg영업 || sugg영업.length === 0) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); setHighlightIdx영업((i) => Math.min(i + 1, sugg영업.length - 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setHighlightIdx영업((i) => Math.max(i - 1, -1)); }
+    else if (e.key === "Enter" && highlightIdx영업 >= 0) { e.preventDefault(); select영업Suggestion(sugg영업[highlightIdx영업]); }
+    else if (e.key === "Escape") { setShowSugg영업(false); setHighlightIdx영업(-1); }
+  };
+
+  const handleClose = () => { setForm(null); setLinkedName(""); setShowSugg영업(false); setHighlightIdx영업(-1); setError(""); onClose(); };
 
   const submit = async () => {
     if (!form.날짜 || !form.고객사) return;
@@ -105,7 +129,13 @@ export default function EditBillingModal({
         setError(`저장 실패: ${data.error || res.status}`);
         return;
       }
+      if (linkedName) {
+        localStorage.setItem(`billing_linked_name_${row.rowIndex}`, linkedName);
+      } else {
+        localStorage.removeItem(`billing_linked_name_${row.rowIndex}`);
+      }
       setForm(null);
+      setLinkedName("");
       onClose();
       router.refresh();
     } finally {
@@ -163,6 +193,33 @@ export default function EditBillingModal({
                   >
                     {c}
                   </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div style={{ gridColumn: "1 / -1", position: "relative" }}>
+            <label style={lbl}>영업활동명 (계약관리 고객과 연결)</label>
+            <input
+              type="text"
+              placeholder="영업활동명 입력"
+              value={linkedName}
+              onChange={(e) => { setLinkedName(e.target.value); setShowSugg영업(true); setHighlightIdx영업(-1); }}
+              onFocus={() => setShowSugg영업(true)}
+              onBlur={() => { blurTimer영업.current = setTimeout(() => { setShowSugg영업(false); setHighlightIdx영업(-1); }, 150); }}
+              onKeyDown={handleKeyDown영업}
+              style={inp}
+            />
+            {showSugg영업 && sugg영업.length > 0 && (
+              <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10, background: T.bg.card, border: `1px solid ${T.border}`, borderRadius: 8, boxShadow: "0 4px 20px rgba(0,0,0,0.15)", maxHeight: 200, overflowY: "auto" }}>
+                {sugg영업.map((c, i) => (
+                  <div
+                    key={c}
+                    onMouseDown={() => select영업Suggestion(c)}
+                    style={{ padding: "9px 14px", fontSize: 13, cursor: "pointer", color: T.text.primary, borderBottom: `1px solid ${T.border}`, background: i === highlightIdx영업 ? (isDark ? "rgba(123,112,238,0.2)" : "rgba(123,112,238,0.1)") : "transparent" }}
+                    onMouseEnter={() => setHighlightIdx영업(i)}
+                    onMouseLeave={() => setHighlightIdx영업(-1)}
+                  >{c}</div>
                 ))}
               </div>
             )}

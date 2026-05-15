@@ -13,7 +13,7 @@ export async function POST(req: Request) {
     const 날짜 = String(body.날짜 ?? "").trim();
     const [year, month] = 날짜.split("-");
 
-    await addBillingRow({
+    const rowIndex = await addBillingRow({
       날짜,
       연도: year ?? "",
       월: month ? String(Number(month)) : "",
@@ -25,7 +25,7 @@ export async function POST(req: Request) {
       사업부문: String(body.사업부문 ?? "").trim(),
     });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, rowIndex });
   } catch (err) {
     console.error("[billing/create] error:", err);
     return NextResponse.json({ error: String(err) }, { status: 500 });

@@ -24,7 +24,7 @@ const autoVat = (공급가액: string) => {
   return isNaN(n) || 공급가액 === "" ? "—" : Math.round(n * 1.1).toLocaleString("ko-KR") + "원";
 };
 
-export default function BillingView({ rows }: { rows: BillingRow[] }) {
+export default function BillingView({ rows, masterCustomers = [] }: { rows: BillingRow[]; masterCustomers?: string[] }) {
   const router = useRouter();
   const { isDark } = useTheme();
   const T = isDark ? DARK : LIGHT;
@@ -52,6 +52,7 @@ export default function BillingView({ rows }: { rows: BillingRow[] }) {
   const [dateEdit, setDateEdit] = useState<DateEdit>(null);
   const [editDate, setEditDate] = useState(today());
 
+  // 기존 청구 고객사명 자동완성 소스
   const customers = useMemo(
     () => Array.from(new Set(rows.map((r) => r.고객사).filter(Boolean))).sort(),
     [rows]
@@ -454,8 +455,8 @@ export default function BillingView({ rows }: { rows: BillingRow[] }) {
         </div>
       </div>
 
-      <NewBillingModal open={newOpen} onClose={() => setNewOpen(false)} customers={customers} />
-      <EditBillingModal row={editTarget} open={!!editTarget} onClose={() => setEditTarget(null)} customers={customers} />
+      <NewBillingModal open={newOpen} onClose={() => setNewOpen(false)} customers={customers} masterCustomers={masterCustomers} />
+      <EditBillingModal row={editTarget} open={!!editTarget} onClose={() => setEditTarget(null)} customers={customers} masterCustomers={masterCustomers} />
     </div>
   );
 }

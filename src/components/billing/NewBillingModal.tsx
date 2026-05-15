@@ -26,24 +26,33 @@ type Form = {
 const EMPTY: Form = { 날짜: "", 고객사: "", 서비스: "", 서비스분류: "", 공급가액: "", 부가세포함: "", 사업부문: "" };
 
 export default function NewBillingModal({
-  open, onClose, customers,
+  open, onClose, customers, masterCustomers = [],
 }: {
-  open: boolean; onClose: () => void; customers: string[];
+  open: boolean; onClose: () => void; customers: string[]; masterCustomers?: string[];
 }) {
   const router = useRouter();
   const { isDark } = useTheme();
   const T = isDark ? DARK : LIGHT;
   const [form, setForm] = useState<Form>(EMPTY);
+  const [linkedName, setLinkedName] = useState(""); // 영업활동명 연결 (localStorage only)
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [showSugg, setShowSugg] = useState(false);
   const [highlightIdx, setHighlightIdx] = useState(-1);
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [showSugg영업, setShowSugg영업] = useState(false);
+  const [highlightIdx영업, setHighlightIdx영업] = useState(-1);
+  const blurTimer영업 = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   if (!open) return null;
 
   const suggestions = form.고객사
     ? customers.filter((c) => c.toLowerCase().includes(form.고객사.toLowerCase())).slice(0, 10)
+    : [];
+
+  const sugg영업 = linkedName
+    ? masterCustomers.filter((c) => c.toLowerCase().includes(linkedName.toLowerCase())).slice(0, 10)
     : [];
 
   const set = (key: keyof Form, value: string) => {
@@ -71,19 +80,34 @@ export default function NewBillingModal({
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!showSugg || suggestions.length === 0) return;
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setHighlightIdx((i) => Math.min(i + 1, suggestions.length - 1));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setHighlightIdx((i) => Math.max(i - 1, -1));
-    } else if (e.key === "Enter" && highlightIdx >= 0) {
-      e.preventDefault();
-      selectSuggestion(suggestions[highlightIdx]);
-    } else if (e.key === "Escape") {
-      setShowSugg(false);
-      setHighlightIdx(-1);
-    }
+    if (e.key === "ArrowDown") { e.preventDefault(); setHighlightIdx((i) => Math.min(i + 1, suggestions.length - 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setHighlightIdx((i) => Math.max(i - 1, -1)); }
+    else if (e.key === "Enter" && highlightIdx >= 0) { e.preventDefault(); selectSuggestion(suggestions[highlightIdx]); }
+    else if (e.key === "Escape") { setShowSugg(false); setHighlightIdx(-1); }
+  };
+
+  const select영업Suggestion = (c: string) => {
+    if (blurTimer영업.current) clearTimeout(blurTimer영업.current);
+    setLinkedName(c);
+    setShowSugg영업(false);
+    setHighlightIdx영업(-1);
+  };
+
+  const handleKeyDown영업 = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSugg영업 || sugg영업.length === 0) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); setHighlightIdx영업((i) => Math.min(i + 1, sugg영업.length - 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setHighlightIdx영업((i) => Math.max(i - 1, -1)); }
+    else if (e.key === "Enter" && highlightIdx영업 >= 0) { e.preventDefault(); select영업Suggestion(sugg영업[highlightIdx영업]); }
+    else if (e.key === "Escape") { setShowSugg영업(false); setHighlightIdx영업(-1); }
+  };
+
+  const handleClose = () => {
+    setForm(EMPTY);
+    setLinkedName("");
+    setShowSugg영업(false);
+    setHighlightIdx영업(-1);
+    setError("");
+    onClose();
   };
 
   const submit = async () => {
@@ -101,7 +125,13 @@ export default function NewBillingModal({
         setError(`저장 실패: ${data.error || res.status}`);
         return;
       }
+      const data = await res.json();
+      // 영업활동명 연결 정보를 localStorage에 저장 (구글시트와 무관)
+      if (linkedName && data.rowIndex) {
+        localStorage.setItem(`billing_linked_name_${data.rowIndex}`, linkedName);
+      }
       setForm(EMPTY);
+      setLinkedName("");
       onClose();
       router.refresh();
     } finally {
@@ -119,7 +149,7 @@ export default function NewBillingModal({
   return (
     <div
       style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center" }}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+      onClick={(e) => e.target === e.currentTarget && handleClose()}
     >
       <div style={{ width: 480, maxHeight: "90vh", overflowY: "auto", background: T.bg.card, borderRadius: 16, padding: "28px 32px", border: `1px solid ${T.border}`, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
         <h2 style={{ margin: "0 0 24px", fontSize: 16, fontWeight: 700, color: T.text.primary }}>신규 청구 추가</h2>
@@ -130,11 +160,12 @@ export default function NewBillingModal({
             <input type="date" value={form.날짜} onChange={(e) => set("날짜", e.target.value)} style={inp} />
           </div>
 
+          {/* 고객사 자동완성 */}
           <div style={{ gridColumn: "1 / -1", position: "relative" }}>
             <label style={lbl}>고객사 *</label>
             <input
               type="text"
-              placeholder="고객사명 입력 또는 선택"
+              placeholder="고객사명 입력"
               value={form.고객사}
               onChange={(e) => { set("고객사", e.target.value); setShowSugg(true); setHighlightIdx(-1); }}
               onFocus={() => setShowSugg(true)}
@@ -143,31 +174,49 @@ export default function NewBillingModal({
               style={inp}
             />
             {showSugg && suggestions.length > 0 && (
-              <div style={{
-                position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10,
-                background: T.bg.card, border: `1px solid ${T.border}`, borderRadius: 8,
-                boxShadow: "0 4px 20px rgba(0,0,0,0.15)", maxHeight: 200, overflowY: "auto",
-              }}>
+              <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10, background: T.bg.card, border: `1px solid ${T.border}`, borderRadius: 8, boxShadow: "0 4px 20px rgba(0,0,0,0.15)", maxHeight: 200, overflowY: "auto" }}>
                 {suggestions.map((c, i) => (
                   <div
                     key={c}
                     onMouseDown={() => selectSuggestion(c)}
-                    style={{
-                      padding: "9px 14px", fontSize: 13, cursor: "pointer", color: T.text.primary,
-                      borderBottom: `1px solid ${T.border}`,
-                      background: i === highlightIdx
-                        ? (isDark ? "rgba(123,112,238,0.2)" : "rgba(123,112,238,0.1)")
-                        : "transparent",
-                    }}
+                    style={{ padding: "9px 14px", fontSize: 13, cursor: "pointer", color: T.text.primary, borderBottom: `1px solid ${T.border}`, background: i === highlightIdx ? (isDark ? "rgba(123,112,238,0.2)" : "rgba(123,112,238,0.1)") : "transparent" }}
                     onMouseEnter={() => setHighlightIdx(i)}
                     onMouseLeave={() => setHighlightIdx(-1)}
-                  >
-                    {c}
-                  </div>
+                  >{c}</div>
                 ))}
               </div>
             )}
           </div>
+
+          {/* 영업활동명 연결 — localStorage만, 구글시트 저장 없음 */}
+          {masterCustomers.length > 0 && (
+            <div style={{ gridColumn: "1 / -1", position: "relative" }}>
+              <label style={lbl}>영업활동명 (계약관리 고객과 연결)</label>
+              <input
+                type="text"
+                placeholder="영업활동명 입력"
+                value={linkedName}
+                onChange={(e) => { setLinkedName(e.target.value); setShowSugg영업(true); setHighlightIdx영업(-1); }}
+                onFocus={() => setShowSugg영업(true)}
+                onBlur={() => { blurTimer영업.current = setTimeout(() => { setShowSugg영업(false); setHighlightIdx영업(-1); }, 150); }}
+                onKeyDown={handleKeyDown영업}
+                style={inp}
+              />
+              {showSugg영업 && sugg영업.length > 0 && (
+                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10, background: T.bg.card, border: `1px solid ${T.border}`, borderRadius: 8, boxShadow: "0 4px 20px rgba(0,0,0,0.15)", maxHeight: 200, overflowY: "auto" }}>
+                  {sugg영업.map((c, i) => (
+                    <div
+                      key={c}
+                      onMouseDown={() => select영업Suggestion(c)}
+                      style={{ padding: "9px 14px", fontSize: 13, cursor: "pointer", color: T.text.primary, borderBottom: `1px solid ${T.border}`, background: i === highlightIdx영업 ? (isDark ? "rgba(123,112,238,0.2)" : "rgba(123,112,238,0.1)") : "transparent" }}
+                      onMouseEnter={() => setHighlightIdx영업(i)}
+                      onMouseLeave={() => setHighlightIdx영업(-1)}
+                    >{c}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           <div>
             <label style={lbl}>서비스</label>
@@ -199,13 +248,11 @@ export default function NewBillingModal({
         </div>
 
         {error && (
-          <div style={{ marginTop: 12, padding: "8px 12px", borderRadius: 8, background: "rgba(239,68,68,0.1)", color: "#EF4444", fontSize: 12 }}>
-            {error}
-          </div>
+          <div style={{ marginTop: 12, padding: "8px 12px", borderRadius: 8, background: "rgba(239,68,68,0.1)", color: "#EF4444", fontSize: 12 }}>{error}</div>
         )}
 
         <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
-          <button onClick={onClose} style={{ padding: "9px 20px", borderRadius: 8, border: `1px solid ${T.border}`, background: "transparent", color: T.text.secondary, fontSize: 13, cursor: "pointer" }}>취소</button>
+          <button onClick={handleClose} style={{ padding: "9px 20px", borderRadius: 8, border: `1px solid ${T.border}`, background: "transparent", color: T.text.secondary, fontSize: 13, cursor: "pointer" }}>취소</button>
           <button
             onClick={submit}
             disabled={saving || !form.날짜 || !form.고객사}
