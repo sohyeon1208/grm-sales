@@ -189,34 +189,32 @@ export default function NewBillingModal({
           </div>
 
           {/* 영업활동명 연결 — localStorage만, 구글시트 저장 없음 */}
-          {masterCustomers.length > 0 && (
-            <div style={{ gridColumn: "1 / -1", position: "relative" }}>
-              <label style={lbl}>영업활동명 (계약관리 고객과 연결)</label>
-              <input
-                type="text"
-                placeholder="영업활동명 입력"
-                value={linkedName}
-                onChange={(e) => { setLinkedName(e.target.value); setShowSugg영업(true); setHighlightIdx영업(-1); }}
-                onFocus={() => setShowSugg영업(true)}
-                onBlur={() => { blurTimer영업.current = setTimeout(() => { setShowSugg영업(false); setHighlightIdx영업(-1); }, 150); }}
-                onKeyDown={handleKeyDown영업}
-                style={inp}
-              />
-              {showSugg영업 && sugg영업.length > 0 && (
-                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10, background: T.bg.card, border: `1px solid ${T.border}`, borderRadius: 8, boxShadow: "0 4px 20px rgba(0,0,0,0.15)", maxHeight: 200, overflowY: "auto" }}>
-                  {sugg영업.map((c, i) => (
-                    <div
-                      key={c}
-                      onMouseDown={() => select영업Suggestion(c)}
-                      style={{ padding: "9px 14px", fontSize: 13, cursor: "pointer", color: T.text.primary, borderBottom: `1px solid ${T.border}`, background: i === highlightIdx영업 ? (isDark ? "rgba(123,112,238,0.2)" : "rgba(123,112,238,0.1)") : "transparent" }}
-                      onMouseEnter={() => setHighlightIdx영업(i)}
-                      onMouseLeave={() => setHighlightIdx영업(-1)}
-                    >{c}</div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+          <div style={{ gridColumn: "1 / -1", position: "relative" }}>
+            <label style={lbl}>영업활동명 (계약관리 고객과 연결)</label>
+            <input
+              type="text"
+              placeholder="영업활동명 입력"
+              value={linkedName}
+              onChange={(e) => { setLinkedName(e.target.value); setShowSugg영업(true); setHighlightIdx영업(-1); }}
+              onFocus={() => setShowSugg영업(true)}
+              onBlur={() => { blurTimer영업.current = setTimeout(() => { setShowSugg영업(false); setHighlightIdx영업(-1); }, 150); }}
+              onKeyDown={handleKeyDown영업}
+              style={inp}
+            />
+            {showSugg영업 && sugg영업.length > 0 && (
+              <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10, background: T.bg.card, border: `1px solid ${T.border}`, borderRadius: 8, boxShadow: "0 4px 20px rgba(0,0,0,0.15)", maxHeight: 200, overflowY: "auto" }}>
+                {sugg영업.map((c, i) => (
+                  <div
+                    key={c}
+                    onMouseDown={() => select영업Suggestion(c)}
+                    style={{ padding: "9px 14px", fontSize: 13, cursor: "pointer", color: T.text.primary, borderBottom: `1px solid ${T.border}`, background: i === highlightIdx영업 ? (isDark ? "rgba(123,112,238,0.2)" : "rgba(123,112,238,0.1)") : "transparent" }}
+                    onMouseEnter={() => setHighlightIdx영업(i)}
+                    onMouseLeave={() => setHighlightIdx영업(-1)}
+                  >{c}</div>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div>
             <label style={lbl}>서비스</label>
