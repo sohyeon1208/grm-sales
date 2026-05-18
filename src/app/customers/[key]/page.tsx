@@ -43,7 +43,7 @@ export default async function CustomerDetailPage({ params }: PageProps) {
     <div className="px-6 py-6 max-w-[1400px] mx-auto">
       <CustomerHeader customer={customer} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-5">
         {/* 왼쪽 — 계약/정산/세금계산서 */}
         <div className="space-y-5">
           <ContractCard customer={customer} />
