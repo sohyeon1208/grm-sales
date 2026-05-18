@@ -119,8 +119,8 @@ export default function BillingHistoryCard({
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ background: isDark ? "rgba(255,255,255,0.04)" : "rgba(26,28,51,0.04)" }}>
-                {["날짜", "고객사", "서비스", "공급가액", "세금계산서", "입금"].map((h) => (
-                  <th key={h} style={{ padding: "8px 10px", textAlign: "left", fontSize: 11, fontWeight: 600, color: T.text.muted, borderBottom: `1px solid ${T.border}`, whiteSpace: "nowrap" }}>{h}</th>
+                {["날짜", "서비스", "공급가액", "상태"].map((h) => (
+                  <th key={h} style={{ padding: "7px 8px", textAlign: "left", fontSize: 11, fontWeight: 600, color: T.text.muted, borderBottom: `1px solid ${T.border}`, whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -136,29 +136,28 @@ export default function BillingHistoryCard({
                     onMouseEnter={(e) => (e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.02)" : "rgba(26,28,51,0.02)")}
                     onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                   >
-                    <td style={{ padding: "8px 10px", color: T.text.secondary, whiteSpace: "nowrap" }}>{row.날짜}</td>
-                    <td style={{ padding: "8px 10px", color: T.text.secondary, fontSize: 12 }}>{row.고객사}</td>
-                    <td style={{ padding: "8px 10px", color: T.text.secondary }}>{row.서비스 || "—"}</td>
-                    <td style={{ padding: "8px 10px", fontWeight: 500, textAlign: "right", whiteSpace: "nowrap" }}>{fmtMoney(row.공급가액)}</td>
-                    <td style={{ padding: "8px 10px" }}>
-                      {tax?.issued ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                          <span style={{ padding: "2px 7px", borderRadius: 20, background: "rgba(0,207,170,0.12)", color: "#00CFAA", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}>발행완료</span>
-                          {tax.date && <span style={{ fontSize: 11, color: T.text.muted }}>{tax.date}</span>}
+                    <td style={{ padding: "7px 8px", color: T.text.secondary, whiteSpace: "nowrap", fontSize: 12 }}>{row.날짜}</td>
+                    <td style={{ padding: "7px 8px", color: T.text.secondary, fontSize: 12 }}>{row.서비스 || "—"}</td>
+                    <td style={{ padding: "7px 8px", fontWeight: 500, textAlign: "right", whiteSpace: "nowrap", fontSize: 12 }}>{fmtMoney(row.공급가액)}</td>
+                    <td style={{ padding: "7px 8px" }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          {tax?.issued ? (
+                            <span style={{ padding: "2px 7px", borderRadius: 20, background: "rgba(0,207,170,0.12)", color: "#00CFAA", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}>세금계산서 발행</span>
+                          ) : (
+                            <span style={{ padding: "2px 7px", borderRadius: 20, background: "rgba(245,158,11,0.1)", color: "#F59E0B", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}>세금계산서 미발행</span>
+                          )}
+                          {tax?.issued && tax.date && <span style={{ fontSize: 11, color: T.text.muted }}>{tax.date}</span>}
                         </div>
-                      ) : (
-                        <span style={{ padding: "2px 7px", borderRadius: 20, background: "rgba(245,158,11,0.1)", color: "#F59E0B", fontSize: 11, fontWeight: 600 }}>미발행</span>
-                      )}
-                    </td>
-                    <td style={{ padding: "8px 10px" }}>
-                      {paid ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                          <span style={{ padding: "2px 7px", borderRadius: 20, background: "rgba(59,130,246,0.12)", color: "#3B82F6", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}>입금완료</span>
-                          {payDate && <span style={{ fontSize: 11, color: T.text.muted }}>{payDate}</span>}
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          {paid ? (
+                            <span style={{ padding: "2px 7px", borderRadius: 20, background: "rgba(59,130,246,0.12)", color: "#3B82F6", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}>입금완료</span>
+                          ) : (
+                            <span style={{ padding: "2px 7px", borderRadius: 20, background: "rgba(239,68,68,0.1)", color: "#EF4444", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}>미입금</span>
+                          )}
+                          {paid && payDate && <span style={{ fontSize: 11, color: T.text.muted }}>{payDate}</span>}
                         </div>
-                      ) : (
-                        <span style={{ padding: "2px 7px", borderRadius: 20, background: "rgba(239,68,68,0.1)", color: "#EF4444", fontSize: 11, fontWeight: 600 }}>미입금</span>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 );
