@@ -190,7 +190,7 @@ export default function NewBillingModal({
 
           {/* 영업활동명 연결 — localStorage만, 구글시트 저장 없음 */}
           <div style={{ gridColumn: "1 / -1", position: "relative" }}>
-            <label style={lbl}>영업활동명 (계약관리 고객과 연결)</label>
+            <label style={lbl}>영업활동명(계약관리 고객과연결)</label>
             <input
               type="text"
               placeholder="영업활동명 입력"
