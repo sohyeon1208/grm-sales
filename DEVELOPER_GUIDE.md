@@ -1,7 +1,7 @@
 # Gooroomee Sales — 개발자 인수인계 문서
 
 > 최초 작성일: 2026년 5월  
-> 최종 업데이트: 2026년 5월 15일  
+> 최종 업데이트: 2026년 5월 19일  
 > 작성 목적: 담당자 교체 시 신규 개발자가 이 문서만으로 유지보수·기능 추가를 할 수 있도록 작성
 
 ---
@@ -39,7 +39,8 @@
 
 - **매출 대시보드**: 월별 매출, 채널별 분포, KPI 카드, 다크/라이트 테마 지원
 - **계약 관리**: 고객사 칸반 보드, D-Day 표시, 계약 만료 필터, 전역 검색
-- **고객 상세**: 계약정보·정산정보·히스토리 타임라인, 고객정보 수정·삭제
+- **고객 상세**: 계약정보·정산정보·청구이력·히스토리 타임라인, 고객정보 수정·삭제
+- **청구/정산관리**: 세금계산서 발행 이력 관리, 신규 추가·수정·삭제, 입금/세금계산서 상태 관리, 계약관리 고객과 연결
 - **히스토리**: 추가·수정·삭제, 작성자 자동 기록
 - **정산 캘린더**: 월별 정산 대상 고객 카드, 템플릿 복사 버튼
 - **전역 검색**: 상단 검색바 Enter → 고객사 검색 결과 페이지(`/customers?q=`)
@@ -55,6 +56,7 @@
 | 스타일 | **Tailwind CSS 4** (인라인 style 병행) |
 | 인증 | **NextAuth v5** (beta, Google OAuth 2.0) |
 | 데이터 | **googleapis 171** (Google Sheets API v4) |
+| 캐싱 | **`unstable_cache`** (Next.js 내장, 태그 기반 무효화) |
 | 차트 | **Recharts 3** |
 | 배포 | **Vercel** (GitHub 자동 배포) |
 | 폰트 | Pretendard (CDN) |
@@ -90,12 +92,12 @@ npm run dev
 ### Git 리모트 구조
 
 ```
-origin    → https://github.com/sohyeon1208/gooroomee.git  (읽기 전용 참고용)
-grm_test  → https://github.com/sohyeon1208/grm_test.git   (테스트 배포용)
+origin    → https://github.com/sohyeon1208/gooroomee.git  (읽기 전용 참고용 — push 금지)
 grm_sales → https://github.com/sohyeon1208/grm-sales.git  (프로덕션 배포용) ★ 메인
 ```
 
-> **배포할 때는 `git push grm_sales main`으로 push합니다.**  
+> **배포할 때는 반드시 `git push grm_sales main`으로 push합니다.**  
+> `origin`에 push하면 다른 저장소로 올라가므로 절대 사용하지 마세요.  
 > Vercel이 GitHub 변경을 자동 감지해 빌드·배포를 시작합니다.
 
 ---
@@ -141,13 +143,31 @@ Vercel 대시보드 → 프로젝트 → **Settings → Environment Variables**�
 
 ### 탭 구조
 
-| 탭 이름 | 용도 | 코드 상수 |
+| 탭 이름 | 용도 | 코드 파일 |
 |---------|------|-----------|
-| `👥 고객사 마스터` | 고객 전체 목록 | `CUSTOMERS_SHEET_NAME` |
-| `히스토리 전체` | 기존 히스토리 아카이브 | `HISTORY_ARCHIVE_SHEET` |
-| `히스토리 입력` | 사이트에서 새로 추가한 히스토리 | `HISTORY_INPUT_SHEET` |
+| `📋 마스터데이터` | 청구/정산 이력 (세금계산서 발행 데이터) | `src/lib/billing.ts` |
+| `👥 고객사 마스터` | 고객 전체 목록 | `src/lib/customers.ts` |
+| `히스토리 전체` | 기존 히스토리 아카이브 | `src/lib/history.ts` |
+| `히스토리 입력` | 사이트에서 새로 추가한 히스토리 | `src/lib/history.ts` |
 
-> 탭 이름이 코드와 정확히 일치해야 합니다. 탭 이름을 바꾸면 `src/lib/customers.ts`와 `src/lib/history.ts`의 상수도 함께 변경해야 합니다.
+> 탭 이름이 코드와 정확히 일치해야 합니다. 이모지, 공백 포함.  
+> `node scripts/list-sheets.mjs`로 실제 탭 이름 확인 가능.
+
+### 📋 마스터데이터 탭 컬럼 구조 (A~K열) — 청구/정산 데이터
+
+| 열 | 필드명 | 코드 필드 |
+|----|--------|-----------|
+| A | 날짜 | `날짜` |
+| B | 고객사 | `고객사` |
+| C | 서비스 | `서비스` |
+| D | 서비스분류 | `서비스분류` |
+| E | 공급가액 | `공급가액` |
+| F | 부가세포함 | `부가세포함` |
+| G | 사업부문 | `사업부문` |
+| (H~K) | 기타 | — |
+
+> `rowIndex`는 시트 행 번호(1-based). 코드에서 `getBillingData()` 반환 값에 자동 포함.  
+> 세금계산서 발행 여부·입금 여부는 **Google Sheets에 저장하지 않고** `localStorage`로만 관리합니다 (아래 7-12절 참고).
 
 ### 고객사 마스터 탭 컬럼 구조 (A~S열)
 
@@ -187,8 +207,7 @@ Vercel 대시보드 → 프로젝트 → **Settings → Environment Variables**�
 | F | 영업단계 (신규 추가 시 공란) |
 | G | 히스토리 내용 + 작성자 |
 
-> **중요**: 히스토리 추가 시 A열에 반드시 빈 문자열을 포함해 7개 값을 전달해야 컬럼이 밀리지 않습니다. (`appendRow` 버그 방지)  
-> **그룹ID·영업단계는 신규 추가 시 항상 공란("")으로 처리합니다.** (기존 데이터와 혼용 방지)
+> **중요**: 히스토리 추가 시 A열에 반드시 빈 문자열을 포함해 7개 값을 전달해야 컬럼이 밀리지 않습니다. (`appendRow` 버그 방지)
 
 ---
 
@@ -206,10 +225,16 @@ src/
 │   ├── login/page.tsx            # Google 로그인 페이지 (라이트 디자인 + 구루미 로고)
 │   ├── customers/
 │   │   ├── page.tsx              # 계약 관리 목록 (검색어 있으면 /customers?q= 검색결과)
-│   │   └── [key]/page.tsx        # 고객 상세 페이지
+│   │   └── [key]/page.tsx        # 고객 상세 페이지 (계약/정산/청구이력 + 히스토리)
+│   ├── billing/page.tsx          # 청구/정산관리 페이지
 │   ├── settlement/page.tsx       # 정산 캘린더 페이지
 │   └── api/
 │       ├── auth/[...nextauth]/   # NextAuth 핸들러
+│       ├── billing/
+│       │   ├── create/           # 청구 신규 추가 (rowIndex 반환)
+│       │   ├── edit/             # 청구 내역 수정
+│       │   ├── delete/           # 청구 행 삭제
+│       │   └── update/           # 세금계산서·입금 상태 업데이트 (localStorage 보조)
 │       ├── customers/
 │       │   ├── create/           # 신규 고객 추가
 │       │   ├── update/           # 고객 정보 수정 (ContractCard, SettlementCard, EditCustomerModal)
@@ -226,8 +251,10 @@ src/
 │
 ├── lib/                          # 서버 사이드 유틸리티
 │   ├── google.ts                 # Google Sheets API 공통 함수
-│   ├── customers.ts              # 고객 CRUD 함수 (A:S 범위)
-│   ├── history.ts                # 히스토리 CRUD 함수
+│   ├── billing.ts                # 청구 데이터 read/write (unstable_cache 포함)
+│   ├── customers.ts              # 고객 CRUD 함수 (unstable_cache 포함)
+│   ├── history.ts                # 히스토리 CRUD 함수 (unstable_cache 포함)
+│   ├── sheets.ts                 # 매출 데이터 (getSalesData, unstable_cache 포함)
 │   ├── contractItem.ts           # 서비스 자동 추론 로직
 │   ├── theme.ts                  # 다크/라이트 테마 색상 토큰
 │   └── format.ts                 # 숫자/날짜 포맷 함수
@@ -242,9 +269,14 @@ src/
     │   ├── CustomerHeader.tsx    # 고객 상세 헤더 (영업단계 변경 + 고객정보 수정 버튼)
     │   ├── ContractCard.tsx      # 계약 정보 카드 (계약시작일 포함, 인라인 수정)
     │   ├── SettlementCard.tsx    # 정산 정보 카드 (인라인 수정)
+    │   ├── BillingHistoryCard.tsx# 세금계산서 발행 이력 카드 (고객 상세에 표시)
     │   ├── HistoryTimeline.tsx   # 히스토리 타임라인 (추가/수정/삭제, 작성자 분리 표시)
     │   ├── AddHistoryModal.tsx   # 히스토리 추가 모달
     │   └── EditCustomerModal.tsx # 고객 기본정보 수정 + 2단계 삭제 모달
+    ├── billing/
+    │   ├── BillingView.tsx       # 청구/정산관리 메인 (테이블 + 필터 + 상태 관리)
+    │   ├── NewBillingModal.tsx   # 신규 청구 추가 모달 (고객사 자동완성, 영업활동명 연결)
+    │   └── EditBillingModal.tsx  # 청구 내역 수정 모달 (영업활동명 연결 수정 포함)
     ├── contracts/
     │   ├── ContractsBoard.tsx    # 계약 관리 메인 (칸반 + 필터)
     │   ├── CustomerKanban.tsx    # 영업단계별 칸반 카드
@@ -273,18 +305,30 @@ src/
 - 로그아웃 후 다시 로그인하면 **항상 계정 선택 화면**이 뜨도록 설정됨 (`prompt: "select_account"`)
 - 로그인한 사용자 이름은 `session.user.name`으로 접근 가능
 
-### 7-2. 데이터 읽기/쓰기 흐름
+### 7-2. 데이터 읽기/쓰기 흐름 (캐싱 포함)
 
 ```
 페이지(Server Component)
-  → lib/customers.ts 또는 lib/history.ts 함수 호출
-  → lib/google.ts의 readRange / appendRow / updateRange / deleteSheetRow 호출
-  → Google Sheets API 응답
+  → lib/*.ts의 unstable_cache 래핑 함수 호출
+    (캐시 히트 시 → 즉시 반환 / 미스 시 → Google Sheets API 호출 후 캐싱)
   → 컴포넌트에 props로 전달
+
+쓰기(추가/수정/삭제)
+  → API Route에서 Google Sheets에 write
+  → revalidateTag(태그, { expire: 0 }) 호출 → 해당 태그 캐시 즉시 무효화
+  → 다음 요청 시 Google Sheets에서 최신 데이터 다시 조회
 ```
 
-- 모든 페이지에 `export const dynamic = "force-dynamic"` 설정 → 매 요청마다 최신 데이터 조회
-- 클라이언트 컴포넌트에서 데이터 변경 후 `router.refresh()`를 호출해 서버 데이터 갱신
+**캐시 태그 구조**:
+
+| 태그 | 관련 데이터 | 무효화 시점 |
+|------|------------|------------|
+| `"billing"` | 청구/정산 데이터 | billing create/edit/delete/update |
+| `"customers"` | 고객사 마스터 | customers create/update/delete |
+| `"history"` | 히스토리 | history create/update/delete |
+
+> `unstable_cache`는 Next.js 15/16의 내장 캐싱 API입니다.  
+> `revalidateTag` 2번째 인자로 `{ expire: 0 }`을 반드시 전달해야 합니다 (Next.js 16 breaking change).
 
 ### 7-3. 고객 식별 키
 
@@ -355,31 +399,98 @@ URL은 `encodeURIComponent(영업활동명)`으로 구성됩니다.
 고객사 `계약항목` 필드가 비어있으면 `영업활동명`과 `그룹유형`으로 서비스를 자동 추론합니다.  
 로직은 `src/lib/contractItem.ts`에 있습니다.
 
+### 7-12. 청구/정산관리 (billing)
+
+`/billing` 페이지에서 세금계산서 발행 이력을 관리합니다.
+
+**데이터 저장 구조**:
+- 청구 기본 데이터(날짜·고객사·서비스·공급가액 등) → Google Sheets `📋 마스터데이터` 탭
+- 세금계산서 발행 여부·발행일 → `localStorage` (`billing_tax_${rowIndex}`: JSON)
+- 입금 여부 → `localStorage` (`billing_pay_${rowIndex}`: `"O"` 또는 `""`)
+- 입금일 → `localStorage` (`billing_pay_date_${rowIndex}`: 날짜 문자열)
+- **계약관리 고객과 연결** → `localStorage` (`billing_linked_name_${rowIndex}`: 영업활동명)
+
+> localStorage는 브라우저/기기마다 독립적입니다. 같은 컴퓨터의 같은 브라우저에서만 상태가 유지됩니다.
+
+**계약관리 고객 연결 방식**:
+```
+청구/정산관리에서 신규 추가 또는 수정 시
+  → "영업활동명(계약관리 고객과연결)" 필드에 입력
+  → 저장 시 localStorage에 billing_linked_name_${rowIndex} 저장
+  → 고객 상세 페이지의 BillingHistoryCard에서 해당 영업활동명으로 필터링해 표시
+```
+
+**BillingHistoryCard 매칭 로직** (`src/components/customer/BillingHistoryCard.tsx`):
+```typescript
+// row.고객사 === 영업활동명 이거나
+// localStorage의 billing_linked_name_${row.rowIndex} === 영업활동명
+```
+
+**고객사 자동완성 소스**:
+- `NewBillingModal`, `EditBillingModal`의 **고객사** 필드 → 기존 청구 데이터의 고객사명 목록
+- **영업활동명** 필드 → `👥 고객사 마스터`의 영업활동명 목록 (`masterCustomers` prop)
+
+**사업부문 자동계산** (`calcSalesDivision` 함수, `NewBillingModal.tsx`에서 export):
+- 서비스분류 선택 시 사업부문이 자동 입력됨
+- `EditBillingModal`도 동일 함수를 import해서 사용
+
+### 7-13. 고객 상세 페이지 레이아웃
+
+`src/app/customers/[key]/page.tsx`에서 그리드 비율로 레이아웃 조정:
+
+```tsx
+// 현재 비율: 왼쪽(계약/정산/청구이력) : 오른쪽(히스토리) = 1fr : 1.2fr
+<div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-5">
+```
+
+비율 변경 시 이 클래스 값만 수정하면 됩니다.
+
 ---
 
 ## 8. API 라우트 목록
 
 모든 API는 `/src/app/api/` 하위에 있습니다.
 
+### 청구/정산관리 관련
+
+| 메서드 | 경로 | 기능 | 캐시 무효화 |
+|--------|------|------|------------|
+| POST | `/api/billing/create` | 신규 청구 추가 (rowIndex 반환) | `revalidateTag("billing", { expire: 0 })` |
+| POST | `/api/billing/edit` | 청구 내역 수정 | `revalidateTag("billing", { expire: 0 })` |
+| POST | `/api/billing/delete` | 청구 행 삭제 | `revalidateTag("billing", { expire: 0 })` |
+| POST | `/api/billing/update` | 세금계산서·입금 상태 (보조) | `revalidateTag("billing", { expire: 0 })` |
+
 ### 고객 관련
 
-| 메서드 | 경로 | 기능 | 인증 필요 |
-|--------|------|------|-----------|
-| GET | `/api/customers/search?q=검색어` | 고객 검색 (드롭다운) | 미들웨어로 보호 |
-| POST | `/api/customers/create` | 신규 고객 추가 | 미들웨어로 보호 |
-| POST | `/api/customers/update` | 고객 정보 수정 | 미들웨어로 보호 |
-| DELETE | `/api/customers/delete` | 고객 삭제 (행 제거) | 세션 확인 |
-| GET | `/api/customers/stats` | 통계 데이터 | 미들웨어로 보호 |
+| 메서드 | 경로 | 기능 | 캐시 무효화 |
+|--------|------|------|------------|
+| GET | `/api/customers/search?q=검색어` | 고객 검색 (드롭다운) | — |
+| POST | `/api/customers/create` | 신규 고객 추가 | `revalidateTag("customers", { expire: 0 })` |
+| POST | `/api/customers/update` | 고객 정보 수정 | `revalidateTag("customers", { expire: 0 })` |
+| DELETE | `/api/customers/delete` | 고객 삭제 (행 제거) | `revalidateTag("customers", { expire: 0 })` |
+| GET | `/api/customers/stats` | 통계 데이터 | — |
 
 ### 히스토리 관련
 
-| 메서드 | 경로 | 기능 | 인증 필요 |
-|--------|------|------|-----------|
-| POST | `/api/history/create` | 히스토리 추가 (작성자 자동 포함) | 세션 확인 |
-| POST | `/api/history/update` | 히스토리 수정 (날짜·유형·내용) | 세션 확인 |
-| POST | `/api/history/delete` | 히스토리 행 삭제 | 세션 확인 |
+| 메서드 | 경로 | 기능 | 캐시 무효화 |
+|--------|------|------|------------|
+| POST | `/api/history/create` | 히스토리 추가 (작성자 자동 포함) | `revalidateTag("history", { expire: 0 })` |
+| POST | `/api/history/update` | 히스토리 수정 (날짜·유형·내용) | `revalidateTag("history", { expire: 0 })` |
+| POST | `/api/history/delete` | 히스토리 행 삭제 | `revalidateTag("history", { expire: 0 })` |
 
 ### 요청/응답 형식 예시
+
+**청구 신규 추가** (`POST /api/billing/create`):
+```json
+요청: { "날짜": "2026-05-19", "고객사": "구루미", "서비스": "Biz", "서비스분류": "구루미Biz Enterprise", "공급가액": "1000000", "부가세포함": "1100000", "사업부문": "구루미비즈" }
+응답: { "ok": true, "rowIndex": 42 }
+```
+
+**청구 수정** (`POST /api/billing/edit`):
+```json
+요청: { "rowIndex": 42, "날짜": "2026-05-19", "고객사": "구루미", ... }
+응답: { "ok": true }
+```
 
 **고객 수정** (`POST /api/customers/update`):
 ```json
@@ -389,26 +500,7 @@ URL은 `encodeURIComponent(영업활동명)`으로 구성됩니다.
 
 **히스토리 추가** (`POST /api/history/create`):
 ```json
-요청: {
-  "날짜": "2026-05-15",
-  "유형": "게시물",
-  "영업활동명": "한국고용정보원-화상면접",
-  "그룹ID": "",
-  "영업단계": "",
-  "내용": "미팅 완료"
-}
-응답: { "ok": true }
-```
-
-**히스토리 삭제** (`POST /api/history/delete`):
-```json
-요청: { "source": "input", "rowIndex": 5 }
-응답: { "ok": true }
-```
-
-**고객 삭제** (`DELETE /api/customers/delete`):
-```json
-요청: { "key": "한국고용정보원-화상면접" }
+요청: { "날짜": "2026-05-19", "유형": "게시물", "영업활동명": "한국고용정보원-화상면접", "그룹ID": "", "영업단계": "", "내용": "미팅 완료" }
 응답: { "ok": true }
 ```
 
@@ -459,8 +551,6 @@ callbacks: {
 }
 ```
 
-이 한 줄이 `@gooroomee.com`이 아닌 모든 계정의 로그인을 차단합니다.
-
 ---
 
 ## 10. 배포 (Vercel + GitHub)
@@ -469,7 +559,7 @@ callbacks: {
 
 | 저장소 | 용도 | Vercel 프로젝트 |
 |--------|------|-----------------|
-| `sohyeon1208/grm_test` | 테스트용 | grm-test |
+| `sohyeon1208/gooroomee` | 기존 매출 대시보드 (참고용, push 금지) | — |
 | `sohyeon1208/grm-sales` | **프로덕션** ★ | grm-sales |
 
 ### 배포 흐름
@@ -477,7 +567,7 @@ callbacks: {
 ```
 로컬에서 코드 수정
   → git add / git commit
-  → git push grm_sales main
+  → git push grm_sales main          ← 반드시 이 명령 사용
   → GitHub grm-sales 저장소에 push
   → Vercel이 자동으로 빌드 감지
   → 약 1~2분 후 프로덕션 자동 배포 완료
@@ -548,6 +638,16 @@ export default async function Page({ searchParams }: Props) {
 }
 ```
 
+### revalidateTag 사용 시 주의 (Next.js 16 breaking change)
+
+```typescript
+// ❌ Next.js 14 방식 (Next.js 16에서 타입 오류)
+revalidateTag("billing");
+
+// ✅ Next.js 16 방식 (2번째 인자 필수)
+revalidateTag("billing", { expire: 0 });
+```
+
 ### Google Sheets API 주의사항
 
 **행 추가 시 컬럼 오프셋 버그**:
@@ -564,6 +664,14 @@ await appendRow("시트!A:G", ["", 값1, 값2, ...]);
 - Google Sheets API `DeleteDimensionRequest`의 `startIndex`는 **0-based**
 - 변환: `startIndex = rowIndex - 1`
 - sheetId는 숫자(numeric)로 지정해야 하며, `getNumericSheetId()` 헬퍼 함수로 조회합니다
+
+### localStorage 주의사항
+
+청구/정산관리의 세금계산서 발행 상태·입금 여부·계약관리 연결 정보는 localStorage에 저장됩니다.
+
+- **localhost와 Vercel은 localStorage가 공유되지 않습니다.** 로컬에서 입력한 연결 정보는 Vercel에서 보이지 않습니다.
+- 여러 사람이 같은 Vercel 사이트를 쓰더라도 각자의 브라우저에서 독립적입니다.
+- 향후 이 데이터를 Google Sheets에 저장하는 방향으로 개선이 필요할 수 있습니다.
 
 ### 미들웨어(middleware.ts) 주의사항
 
@@ -627,4 +735,4 @@ Google Sheets 탭 이름과 **정확히 일치**해야 합니다 (공백, 이모
 
 ---
 
-*이 문서는 2026년 5월 15일 기준으로 작성되었습니다. 기능 추가 후 반드시 업데이트해주세요.*
+*이 문서는 2026년 5월 19일 기준으로 작성되었습니다. 기능 추가 후 반드시 업데이트해주세요.*
